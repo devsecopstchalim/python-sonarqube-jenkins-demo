@@ -10,7 +10,7 @@ pipeline {
     environment {
         // >>> A MODIFIER : ton nom d'utilisateur Docker Hub (en minuscules) <<<
         DOCKERHUB_USER = 'devsecopstchalim'
-        IMAGE_NAME     = "${DOCKERHUB_USER}/python-sonar-demo"
+        IMAGE_NAME     = "${DOCKERHUB_USER}/python-sonarqube-demo"
     }
 
     stages {
