@@ -100,15 +100,15 @@ pipeline {
                     git config user.name  "Jenkins CI"
 
                     # Replace whatever tag is currently set with the short SHA
-                    sed -i "s|image: .*/python-sonarqube-demo:.*|image: ${IMAGE_NAME}:${SHORT_SHA}|" deployment.yml
+                    sed -i "s|image: .*/python-sonarqube-demo:.*|image: ${IMAGE_NAME}:${SHORT_SHA}|" deployment.txt
 
                     # Nothing changed (e.g. rebuild of the same commit): stop here
-                    if git diff --quiet deployment.yml; then
-                        echo "deployment.yml already up to date"
+                    if git diff --quiet deployment.txt; then
+                        echo "deployment.txt already up to date"
                         exit 0
                     fi
 
-                    git add deployment.yml
+                    git add deployment.txt
                     git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
 
                     REPO_URL=$(git remote get-url origin | sed "s|https://||")

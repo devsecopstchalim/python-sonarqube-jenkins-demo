@@ -1,0 +1,2 @@
+image: devsecopstchalim/python-sonarqube-demo:latest
+          
