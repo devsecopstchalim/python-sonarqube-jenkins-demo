@@ -82,7 +82,7 @@ pipeline {
 
         stage('Docker Push') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-cred',
+                withCredentials([usernamePassword(credentialsId: 'docker_cred',
                                                   usernameVariable: 'DH_USER',
                                                   passwordVariable: 'DH_PASS')]) {
                     sh '''
