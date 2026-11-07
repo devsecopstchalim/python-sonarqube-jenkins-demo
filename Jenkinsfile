@@ -50,11 +50,6 @@ pipeline {
         // Ces stages ne s'exécutent que si le quality gate est PASSED
         stage('Docker Build') {
             steps {
-                script {
-                    if (env.DOCKERHUB_USER == 'devsecopstchalim') {
-                        error('Renseigne DOCKERHUB_USER dans le Jenkinsfile (bloc environment).')
-                    }
-                }
                 sh '''
                     docker build --pull \
                         -t "$IMAGE_NAME:$BUILD_NUMBER" \
@@ -63,7 +58,6 @@ pipeline {
                 '''
             }
         }
-
         stage('Smoke Test Image') {
             steps {
                 sh '''
