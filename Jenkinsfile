@@ -112,14 +112,16 @@ pipeline {
                     // ''' (et non """) : Groovy n'interpole pas le token, c'est le shell qui le lit ; Jenkins le masque dans les logs
                     sh '''
                         set -e
-                        yq -i '.backend.image.tag = strenv(SHORT_SHA)' values.yml
+                        # Remplace la valeur de "tag:" en gardant l'indentation (aucun outil externe requis)
+                        sed -i -E "s|^( *tag:).*|\\1 \\"${SHORT_SHA}\\"|" values.yml
+                        grep -n "tag:" values.yml
                         git diff --quiet values.yml && { echo "no change"; exit 0; }
-
+ 
                         git config user.email "jenkins@ci.local"
                         git config user.name  "Jenkins CI"
                         git add values.yml
                         git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
-
+ 
                         REPO_URL=$(git remote get-url origin | sed "s|https://||")
                         git push "https://x-access-token:${GH_TOKEN}@${REPO_URL}" HEAD:main
                     '''
