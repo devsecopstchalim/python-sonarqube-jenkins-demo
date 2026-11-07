@@ -11,8 +11,6 @@ pipeline {
         // Credential Jenkins (Username with password) -> cree DOCKER_CRED_USR et DOCKER_CRED_PSW
         DOCKER_CRED = credentials('docker_cred')
         IMAGE_NAME  = "${DOCKER_CRED_USR}/python-sonarqube-demo"
-        // Nom d'auteur utilise par le pipeline pour ses propres commits (anti-boucle)
-        CI_AUTHOR   = "Jenkins CI"
     }
 
     stages {
@@ -20,24 +18,11 @@ pipeline {
             steps {
                 checkout scm
                 sh 'git log -1 --oneline'
-                script {
-                    env.SHORT_SHA = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-
-                    // ANTI-BOUCLE (filet de securite) :
-                    // si le dernier commit a ete fait par le pipeline lui-meme, on ne rebuild pas.
-                    def author = sh(returnStdout: true, script: 'git log -1 --pretty=%an').trim()
-                    if (author == env.CI_AUTHOR) {
-                        env.SKIP_PIPELINE = 'true'
-                        currentBuild.result = 'NOT_BUILT'
-                        currentBuild.description = 'Skipped: commit made by CI'
-                        echo "Dernier commit fait par ${env.CI_AUTHOR} -> pipeline ignore."
-                    }
-                }
+                script { env.SHORT_SHA = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim() }
             }
         }
 
         stage('Test') {
-            when { beforeAgent true; expression { env.SKIP_PIPELINE != 'true' } }
             agent { docker { image 'python:3.12-slim'; reuseNode true; args '-e HOME=/tmp' } }
             steps {
                 sh '''
@@ -51,7 +36,6 @@ pipeline {
         }
 
         stage('SonarQube Analysis + Quality Gate') {
-            when { expression { env.SKIP_PIPELINE != 'true' } }
             steps {
                 script {
                     def scannerHome = tool 'SonarScanner'
@@ -63,7 +47,6 @@ pipeline {
         }
 
         stage('Docker Build') {
-            when { expression { env.SKIP_PIPELINE != 'true' } }
             steps {
                 sh '''
                     docker build --pull \
@@ -75,7 +58,6 @@ pipeline {
         }
 
         stage('Smoke Test Image') {
-            when { expression { env.SKIP_PIPELINE != 'true' } }
             steps {
                 sh '''
                     cid=$(docker run -d -p 127.0.0.1::8000 "$IMAGE_NAME:$BUILD_NUMBER")
@@ -92,7 +74,6 @@ pipeline {
         }
 
         stage('Docker Push') {
-            when { expression { env.SKIP_PIPELINE != 'true' } }
             steps {
                 sh '''
                     echo "$DOCKER_CRED_PSW" | docker login -u "$DOCKER_CRED_USR" --password-stdin
@@ -104,29 +85,36 @@ pipeline {
             }
         }
 
-        stage('Update values.yml') {
-            when { expression { env.SKIP_PIPELINE != 'true' } }
+        // GitOps: the new tag goes into the SEPARATE config repo (watched by Argo CD).
+        // That repo has no Jenkins webhook, so this push can never retrigger this pipeline.
+        stage('Update config repo (GitOps)') {
             environment {
-                GIT_USER_NAME = "devsecopstchalim"
-                GIT_REPO_NAME = "python-sonarqube-jenkins-demo"
+                CONFIG_REPO = "devsecopstchalim/test-lab-sonarqube-argocd-kubernetes-jenkins-webhook"
+                CONFIG_FILE = "test-lab/values.yaml"
             }
             steps {
                 withCredentials([string(credentialsId: 'github-cred', variable: 'GITHUB_TOKEN')]) {
                     sh '''
                         set -e
+                        workdir=$(mktemp -d)
+                        trap 'rm -rf "$workdir"' EXIT   # the clone URL contains the token: always delete it
+
+                        git clone --depth 1 "https://${GITHUB_TOKEN}@github.com/${CONFIG_REPO}.git" "$workdir/config"
+                        cd "$workdir/config"
+
                         git config user.email "jenkins@ci.local"
-                        git config user.name  "${CI_AUTHOR}"
+                        git config user.name  "Jenkins CI"
 
-                        grep -qE '^ *tag:' values.yml || { echo "ERREUR: aucune ligne 'tag:' dans values.yml"; exit 1; }
+                        grep -qE '^ *tag:' "$CONFIG_FILE" || { echo "ERROR: no 'tag:' line in $CONFIG_FILE"; exit 1; }
 
-                        sed -i -E "s|^( *tag:).*|\\1 \\"${SHORT_SHA}\\"|" values.yml
-                        grep -n "tag:" values.yml
+                        sed -i -E "s|^( *tag:).*|\\1 \\"${SHORT_SHA}\\"|" "$CONFIG_FILE"
+                        grep -n "tag:" "$CONFIG_FILE"
 
-                        git diff --quiet values.yml && { echo "no change: le tag est deja ${SHORT_SHA}"; exit 0; }
+                        git diff --quiet "$CONFIG_FILE" && { echo "no change: tag already ${SHORT_SHA}"; exit 0; }
 
-                        git add values.yml
-                        git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
-                        git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+                        git add "$CONFIG_FILE"
+                        git commit -m "ci: python-sonarqube-demo -> ${SHORT_SHA} (build ${BUILD_NUMBER})"
+                        git push origin HEAD:main || { git pull --rebase origin main && git push origin HEAD:main; }
                     '''
                 }
             }
@@ -134,13 +122,7 @@ pipeline {
     }
 
     post {
-        success {
-            script {
-                if (env.SKIP_PIPELINE != 'true') {
-                    echo "Pipeline OK : image publiee -> ${env.IMAGE_NAME}:${env.SHORT_SHA}"
-                }
-            }
-        }
+        success { echo "Pipeline OK : image publiee -> ${env.IMAGE_NAME}:${env.SHORT_SHA} ; config repo mis a jour" }
         failure { echo 'Echec : voir Console Output.' }
     }
 }
