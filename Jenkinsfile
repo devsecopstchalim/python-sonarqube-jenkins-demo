@@ -107,7 +107,7 @@ pipeline {
 
                         grep -qE '^ *tag:' "$CONFIG_FILE" || { echo "ERROR: no 'tag:' line in $CONFIG_FILE"; exit 1; }
 
-                        sed -i -E "s|^( *tag:).*|\\1 \\"${SHORT_SHA}\\"|" "$CONFIG_FILE"
+                        sed -i -E "/^canary:/,/^[a-zA-Z]/ s|^( *tag:).*|\\1 \\"${SHORT_SHA}\\"|" "$CONFIG_FILE"
                         grep -n "tag:" "$CONFIG_FILE"
 
                         git diff --quiet "$CONFIG_FILE" && { echo "no change: tag already ${SHORT_SHA}"; exit 0; }
