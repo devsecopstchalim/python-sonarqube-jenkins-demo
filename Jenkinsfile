@@ -88,23 +88,32 @@ pipeline {
             }
         }
 
-                stage('Update values.yml') {
-    environment { GIT_CRED = credentials('github-cred') }
+        stage('Update values.yml') {
+    when { expression { env.SKIP_PIPELINE != 'true' } }
+    environment {
+        GIT_USER_NAME = "devsecopstchalim"
+        GIT_REPO_NAME = "python-sonarqube-jenkins-demo"
+    }
     steps {
-        sh '''
-            set -e
-            yq -i '.backend.image.tag = strenv(SHORT_SHA)' values.yml
-            git diff --quiet values.yml && { echo "no change"; exit 0; }
+        withCredentials([string(credentialsId: 'github-cred', variable: 'GITHUB_TOKEN')]) {
+            sh '''
+                set -e
+                git config user.email "jenkins@ci.local"
+                git config user.name  "Jenkins CI"
 
-            git config user.email "jenkins@ci.local"
-            git config user.name  "Jenkins CI"
-            git add values.yml
-            git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
-            REPO_URL=$(git remote get-url origin | sed "s|https://||")
-            git push "https://${GIT_CRED_USR}:${GIT_CRED_PSW}@${REPO_URL}" HEAD:main
-        '''
+                sed -i -E "s|^( *tag:).*|\\1 \\"${SHORT_SHA}\\"|" values.yml
+                git diff --quiet values.yml && { echo "no change"; exit 0; }
+
+                git add values.yml
+                git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
+                git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+            '''
+        }
     }
 }
+
+        
+
     }
 
     post {
