@@ -88,34 +88,23 @@ pipeline {
             }
         }
 
-                stage('Update Deployment Image') {
-            when { branch 'main' }   // remove if this is not a multibranch job
-            environment {
-                GIT_CRED = credentials('github-cred')   // Username + token (PAT)
-            }
-            steps {
-                sh '''
-                    set -e
-                    git config user.email "jenkins@ci.local"
-                    git config user.name  "Jenkins CI"
+                stage('Update values.yml') {
+    environment { GIT_CRED = credentials('github-cred') }
+    steps {
+        sh '''
+            set -e
+            yq -i '.backend.image.tag = strenv(SHORT_SHA)' values.yml
+            git diff --quiet values.yml && { echo "no change"; exit 0; }
 
-                    # Replace whatever tag is currently set with the short SHA
-                    sed -i "s|image: .*/python-sonarqube-demo:.*|image: ${IMAGE_NAME}:${SHORT_SHA}|" deployment.txt
-
-                    # Nothing changed (e.g. rebuild of the same commit): stop here
-                    if git diff --quiet deployment.txt; then
-                        echo "deployment.txt already up to date"
-                        exit 0
-                    fi
-
-                    git add deployment.txt
-                    git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
-
-                    REPO_URL=$(git remote get-url origin | sed "s|https://||")
-                    git push "https://${GIT_CRED_USR}:${GIT_CRED_PSW}@${REPO_URL}" HEAD:main
-                '''
-            }
-        }
+            git config user.email "jenkins@ci.local"
+            git config user.name  "Jenkins CI"
+            git add values.yml
+            git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
+            REPO_URL=$(git remote get-url origin | sed "s|https://||")
+            git push "https://${GIT_CRED_USR}:${GIT_CRED_PSW}@${REPO_URL}" HEAD:main
+        '''
+    }
+}
     }
 
     post {
