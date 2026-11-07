@@ -18,7 +18,7 @@ pipeline {
         }
 
         stage('Test') {
-            agent { docker { image 'python:3.12-slim'; reuseNode true; args '-e HOME=/tmp' } }
+            agent { docker { image 'python:3.13-slim'; reuseNode true; args '-e HOME=/tmp' } }
             steps {
                 sh '''
                     pip install --user --no-cache-dir -r requirements-dev.txt
