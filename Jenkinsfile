@@ -89,20 +89,22 @@ pipeline {
         }
 
                 stage('Update values.yml') {
-    environment { GIT_CRED = credentials('github-cred') }
     steps {
-        sh '''
-            set -e
-            yq -i '.backend.image.tag = strenv(SHORT_SHA)' values.yml
-            git diff --quiet values.yml && { echo "no change"; exit 0; }
+        withCredentials([string(credentialsId: 'github-cred', variable: 'GH_TOKEN')]) {
+            sh '''
+                set -e
+                yq -i '.backend.image.tag = strenv(SHORT_SHA)' values.yml
+                git diff --quiet values.yml && { echo "no change"; exit 0; }
 
-            git config user.email "jenkins@ci.local"
-            git config user.name  "Jenkins CI"
-            git add values.yml
-            git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
-            REPO_URL=$(git remote get-url origin | sed "s|https://||")
-            git push "https://${GIT_CRED_USR}:${GIT_CRED_PSW}@${REPO_URL}" HEAD:main
-        '''
+                git config user.email "jenkins@ci.local"
+                git config user.name  "Jenkins CI"
+                git add values.yml
+                git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
+
+                REPO_URL=$(git remote get-url origin | sed "s|https://||")
+                git push "https://x-access-token:${GH_TOKEN}@${REPO_URL}" HEAD:main
+            '''
+        }
     }
 }
     }
