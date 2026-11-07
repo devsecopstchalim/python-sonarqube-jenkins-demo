@@ -8,9 +8,10 @@ pipeline {
     }
 
     environment {
-        // >>> A MODIFIER : ton nom d'utilisateur Docker Hub (en minuscules) <<<
-        DOCKERHUB_USER = 'devsecopstchalim'
-        IMAGE_NAME     = "${DOCKERHUB_USER}/python-sonarqube-demo"
+        // Credential Jenkins (Username with password) -> crée DOCKER_CRED_USR et DOCKER_CRED_PSW
+        DOCKER_CRED = credentials('docker_cred')
+        // Le nom d'utilisateur Docker Hub vient du credential : plus rien à écrire en dur
+        IMAGE_NAME  = "${DOCKER_CRED_USR}/python-sonarqube-demo"
     }
 
     stages {
@@ -47,7 +48,7 @@ pipeline {
             }
         }
 
-        // Ces stages ne s'exécutent que si le quality gate est PASSED
+        // Les stages suivants ne s'exécutent que si le quality gate est PASSED
         stage('Docker Build') {
             steps {
                 sh '''
@@ -58,6 +59,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Smoke Test Image') {
             steps {
                 sh '''
@@ -76,17 +78,13 @@ pipeline {
 
         stage('Docker Push') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker_cred',
-                                                  usernameVariable: 'DH_USER',
-                                                  passwordVariable: 'DH_PASS')]) {
-                    sh '''
-                        echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-                        docker push "$IMAGE_NAME:$BUILD_NUMBER"
-                        docker push "$IMAGE_NAME:$SHORT_SHA"
-                        docker push "$IMAGE_NAME:latest"
-                        docker logout
-                    '''
-                }
+                sh '''
+                    echo "$DOCKER_CRED_PSW" | docker login -u "$DOCKER_CRED_USR" --password-stdin
+                    docker push "$IMAGE_NAME:$BUILD_NUMBER"
+                    docker push "$IMAGE_NAME:$SHORT_SHA"
+                    docker push "$IMAGE_NAME:latest"
+                    docker logout
+                '''
             }
         }
     }
