@@ -8,7 +8,7 @@ pipeline {
     }
 
     environment {
-        // Credential Jenkins (Username with password) -> cree DOCKER_CRED_USR et DOCKER_CRED_PSW
+        // Credential Jenkins (Username with password) -> cree DOCKER_CRED_USR et DOCKER_CRED_PSW  
         DOCKER_CRED = credentials('docker_cred')
         IMAGE_NAME  = "${DOCKER_CRED_USR}/python-sonarqube-demo"
     }
