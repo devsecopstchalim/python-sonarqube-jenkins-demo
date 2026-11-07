@@ -2,6 +2,6 @@
 backend:
   image: 
     repository:devsecopstchalim/python-sonarqube-demo
-    tag: "ef32dd0"
+    tag: "c992f00"
 
 
