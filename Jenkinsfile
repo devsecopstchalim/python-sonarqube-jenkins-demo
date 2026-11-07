@@ -19,11 +19,23 @@ pipeline {
             steps {
                 checkout scm
                 sh 'git log -1 --oneline'
-                script { env.SHORT_SHA = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim() }
+                script {
+                    env.SHORT_SHA = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+
+                    // Anti-boucle : si le dernier commit vient de Jenkins (mise a jour de values.yml),
+                    // on saute tous les stages suivants au lieu de relancer un build inutile.
+                    def author = sh(returnStdout: true, script: 'git log -1 --pretty=%an').trim()
+                    if (author == 'Jenkins CI') {
+                        env.SKIP_PIPELINE = 'true'
+                        currentBuild.result = 'NOT_BUILT'
+                        echo "Dernier commit fait par Jenkins CI -> pipeline ignore."
+                    }
+                }
             }
         }
 
         stage('Test') {
+            when { beforeAgent true; expression { env.SKIP_PIPELINE != 'true' } }
             agent { docker { image 'python:3.12-slim'; reuseNode true; args '-e HOME=/tmp' } }
             steps {
                 sh '''
@@ -37,6 +49,7 @@ pipeline {
         }
 
         stage('SonarQube Analysis + Quality Gate') {
+            when { expression { env.SKIP_PIPELINE != 'true' } }
             steps {
                 script {
                     def scannerHome = tool 'SonarScanner'
@@ -50,6 +63,7 @@ pipeline {
 
         // Les stages suivants ne s'exécutent que si le quality gate est PASSED
         stage('Docker Build') {
+            when { expression { env.SKIP_PIPELINE != 'true' } }
             steps {
                 sh '''
                     docker build --pull \
@@ -61,6 +75,7 @@ pipeline {
         }
 
         stage('Smoke Test Image') {
+            when { expression { env.SKIP_PIPELINE != 'true' } }
             steps {
                 sh '''
                     cid=$(docker run -d -p 127.0.0.1::8000 "$IMAGE_NAME:$BUILD_NUMBER")
@@ -77,6 +92,7 @@ pipeline {
         }
 
         stage('Docker Push') {
+            when { expression { env.SKIP_PIPELINE != 'true' } }
             steps {
                 sh '''
                     echo "$DOCKER_CRED_PSW" | docker login -u "$DOCKER_CRED_USR" --password-stdin
@@ -88,29 +104,38 @@ pipeline {
             }
         }
 
-                stage('Update values.yml') {
-    steps {
-        withCredentials([string(credentialsId: 'github-cred', variable: 'GH_TOKEN')]) {
-            sh '''
-                set -e
-                yq -i '.backend.image.tag = strenv(SHORT_SHA)' values.yml
-                git diff --quiet values.yml && { echo "no change"; exit 0; }
+        stage('Update values.yml') {
+            when { expression { env.SKIP_PIPELINE != 'true' } }
+            steps {
+                // 'github-cred' = Secret text (Personal Access Token avec droit d'ecriture sur le repo)
+                withCredentials([string(credentialsId: 'github-cred', variable: 'GH_TOKEN')]) {
+                    // ''' (et non """) : Groovy n'interpole pas le token, c'est le shell qui le lit ; Jenkins le masque dans les logs
+                    sh '''
+                        set -e
+                        yq -i '.backend.image.tag = strenv(SHORT_SHA)' values.yml
+                        git diff --quiet values.yml && { echo "no change"; exit 0; }
 
-                git config user.email "jenkins@ci.local"
-                git config user.name  "Jenkins CI"
-                git add values.yml
-                git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
+                        git config user.email "jenkins@ci.local"
+                        git config user.name  "Jenkins CI"
+                        git add values.yml
+                        git commit -m "ci: deploy ${SHORT_SHA} [skip ci]"
 
-                REPO_URL=$(git remote get-url origin | sed "s|https://||")
-                git push "https://x-access-token:${GH_TOKEN}@${REPO_URL}" HEAD:main
-            '''
+                        REPO_URL=$(git remote get-url origin | sed "s|https://||")
+                        git push "https://x-access-token:${GH_TOKEN}@${REPO_URL}" HEAD:main
+                    '''
+                }
+            }
         }
-    }
-}
     }
 
     post {
-        success { echo "Pipeline OK : image publiee -> ${env.IMAGE_NAME}:${env.BUILD_NUMBER}" }
+        success {
+            script {
+                if (env.SKIP_PIPELINE != 'true') {
+                    echo "Pipeline OK : image publiee -> ${env.IMAGE_NAME}:${env.SHORT_SHA}"
+                }
+            }
+        }
         failure { echo 'Echec : voir Console Output.' }
     }
 }
