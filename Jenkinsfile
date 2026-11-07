@@ -1,26 +1,17 @@
 pipeline {
-    agent any
-
-
-
-    stages {
-        stage('Test') {
-            agent { docker { image 'python:3.12-slim'; reuseNode true; args '-e HOME=/tmp' } }
-            steps {
-                sh '''
-                    pip install --user --no-cache-dir -r requirements-dev.txt
-                    python -m pytest --cov --cov-report=xml:coverage.xml --junitxml=test-results.xml
-                '''
-            }
-            post {
-                always { junit allowEmptyResults: true, testResults: 'test-results.xml' }
-            }
-        }
-
-        
-
-        
+  agent {
+    docker {
+      image 'abhishekf5/maven-abhishek-docker-agent:v1'
+      args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // mount Docker socket to access the host's Docker daemon
     }
-
+  }
+  stages {
+    stage('Checkout') {
+      steps {
+        sh 'echo passed'
+        //git branch: 'main', url: 'https://github.com/iam-veeramalla/Jenkins-Zero-To-Hero.git'
+      }
+    }
+ 
   
 }
