@@ -122,7 +122,7 @@ pipeline {
     }
 
     post {
-        success { echo "Pipeline OK : image publiee -> ${env.IMAGE_NAME}:${env.SHORT_SHA} build ${env.BUILD_NUMBER} ; config repo mis a jour" }
+        success { echo "Pipeline OK : image publiee -> ${env.IMAGE_NAME}:${env.SHORT_SHA} build ${env.BUILD_NUMBER} OK; config repo mis a jour" }
         failure { echo 'Echec : voir Console Output.' }
     }
 }
