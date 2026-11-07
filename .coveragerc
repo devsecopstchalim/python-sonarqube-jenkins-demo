@@ -1,0 +1,6 @@
+[run]
+source = .
+relative_files = True
+omit =
+    test_*.py
+    .venv/*
