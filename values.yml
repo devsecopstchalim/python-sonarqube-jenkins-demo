@@ -2,4 +2,4 @@
 backend:
   image: 
     repository:devsecopstchalim/python-sonarqube-demo 
-    tag: "47255a1"
+    tag: "9ac522c"
