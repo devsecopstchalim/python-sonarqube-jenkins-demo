@@ -1,3 +1,5 @@
 
 backend:
-  image: repository:devsecopstchalim/python-sonarqube-demo tag:latest
+  image: 
+    repository:devsecopstchalim/python-sonarqube-demo 
+    tag:latest
