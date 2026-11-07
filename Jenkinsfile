@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     options {
-        // On désactive le checkout automatique : seul le stage ci-dessous récupère le code.
+
         skipDefaultCheckout(true)
         disableConcurrentBuilds()
         timeout(time: 10, unit: 'MINUTES')
@@ -16,12 +16,8 @@ pipeline {
                 sh 'ls -la'                 // contenu du workspace
             }
         }
-           post {
-        success { echo 'Checkout OK : le pipeline est correctement relié à GitHub.' }
-        failure { echo 'Echec : voir Console Output.' }
-    }
-    }
-    stage('Test') {
+
+        stage('Test') {
             agent { docker { image 'python:3.12-slim'; reuseNode true; args '-e HOME=/tmp' } }
             steps {
                 sh '''
@@ -33,6 +29,9 @@ pipeline {
                 always { junit allowEmptyResults: true, testResults: 'test-results.xml' }
             }
         }
-
- 
+    } 
+    post {
+        success { echo 'Pipeline OK : checkout + tests réussis.' }
+        failure { echo 'Echec : voir Console Output.' }
+    }
 }
