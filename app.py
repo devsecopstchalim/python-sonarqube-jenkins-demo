@@ -8,7 +8,7 @@ def create_app() -> Flask:
 
     @flask_app.get("/health")
     def health():
-        return jsonify(status="ok Argocd sonarqube jenkins")
+        return jsonify(status="ok")
 
     @flask_app.get("/add/<int:a>/<int:b>")
     def add(a, b):
